@@ -1,0 +1,76 @@
+# LiteLLM quickstart stack: the gateway plus a Postgres database that stores
+# models, virtual keys, and spend logs. Used by https://docs.litellm.ai/docs/proxy/docker_quick_start
+#
+# Start it directly:
+#   curl -sSL https://docs.litellm.ai/docker-compose.yml | docker compose -f - up -d
+#
+# The credentials below are placeholders for local evaluation. Before any real
+# use, download this file and set LITELLM_MASTER_KEY and LITELLM_SALT_KEY to
+# long random values, and pin the image to a release tag instead of `latest`.
+services:
+  app:
+    container_name: litellm-app
+    image: docker.litellm.ai/berriai/litellm:latest
+    ports:
+      - "4000:4000"
+    environment:
+      AWS_PROFILE: bedrock
+      AWS_REGION: eu-central-1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
+      STORE_MODEL_IN_DB: "True"
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      REDIS_HOST: valkey
+      REDIS_PORT: 6379
+      #REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ~/.aws:/root/.aws
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--use_v2_migration_resolver"]
+    depends_on:
+      - postgres
+      - valkey
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:4000/health/livenes || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+  postgres:
+    container_name: litellm-postgres
+    image: postgres:18
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litellm
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./data-postgres:/var/lib/postgresql
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:9
+    container_name: litellm-valkey
+    command: valkey-server --save 900 1
+    volumes:
+      - ./data-valkey:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  default:
+    external: true
+    name: service_main
