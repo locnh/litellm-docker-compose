@@ -9,7 +9,7 @@
 # long random values, and pin the image to a release tag instead of `latest`.
 services:
   app:
-    container_name: litellm-app
+    container_name: litellm
     image: docker.litellm.ai/berriai/litellm:latest
     ports:
       - "4000:4000"
@@ -23,6 +23,20 @@ services:
       REDIS_HOST: valkey
       REDIS_PORT: 6379
       #REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      JSON_LOGS: true
+      LITELLM_LOG: INFO
+
+      GENERIC_CLIENT_ID: ${GENERIC_CLIENT_ID}
+      GENERIC_CLIENT_SECRET: ${GENERIC_CLIENT_SECRET}
+      GENERIC_AUTHORIZATION_ENDPOINT: ${GENERIC_AUTHORIZATION_ENDPOINT}
+      GENERIC_TOKEN_ENDPOINT: ${GENERIC_TOKEN_ENDPOINT}
+      GENERIC_USERINFO_ENDPOINT: ${GENERIC_USERINFO_ENDPOINT}
+      GENERIC_SCOPE: ${GENERIC_SCOPE}
+      GENERIC_USER_ROLE_ATTRIBUTE: ${GENERIC_USER_ROLE_ATTRIBUTE}
+      PROXY_BASE_URL: ${PROXY_BASE_URL}
+      PROXY_LOGOUT_URL: ${PROXY_LOGOUT_URL}
+      AUTO_REDIRECT_UI_LOGIN_TO_SSO: ${AUTO_REDIRECT_UI_LOGIN_TO_SSO}
     volumes:
       - ./config.yaml:/app/config.yaml
       - ~/.aws:/root/.aws
@@ -32,9 +46,9 @@ services:
       - valkey
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:4000/health/livenes || exit 1"]
-      interval: 30s
+      interval: 20s
       timeout: 5s
-      start_period: 30s
+      start_period: 5s
       retries: 3
     restart: unless-stopped
 
