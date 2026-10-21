@@ -8,7 +8,7 @@
 # use, download this file and set LITELLM_MASTER_KEY and LITELLM_SALT_KEY to
 # long random values, and pin the image to a release tag instead of `latest`.
 services:
-  app:
+  server:
     container_name: litellm
     image: docker.litellm.ai/berriai/litellm:latest
     ports:
@@ -20,7 +20,7 @@ services:
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
       STORE_MODEL_IN_DB: "True"
       DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
-      REDIS_HOST: valkey
+      REDIS_HOST: dragonfly
       REDIS_PORT: 6379
       #REDIS_PASSWORD: ${REDIS_PASSWORD}
 
@@ -43,7 +43,7 @@ services:
     command: ["--config", "/app/config.yaml", "--port", "4000", "--use_v2_migration_resolver"]
     depends_on:
       - postgres
-      - valkey
+      - dragonfly
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:4000/health/livenes || exit 1"]
       interval: 20s
@@ -51,6 +51,9 @@ services:
       start_period: 5s
       retries: 3
     restart: unless-stopped
+    networks:
+      - internal
+      - service_main
 
   postgres:
     container_name: litellm-postgres
@@ -59,8 +62,8 @@ services:
       POSTGRES_USER: litellm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: litellm
-    ports:
-      - "5432:5432"
+    #ports:
+    #  - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U litellm"]
       interval: 5s
@@ -69,22 +72,39 @@ services:
     volumes:
       - ./data-postgres:/var/lib/postgresql
     restart: unless-stopped
+    networks:
+      - internal
 
-  valkey:
-    image: valkey/valkey:9-alpine
-    container_name: litellm-valkey
-    command: valkey-server --save 900 1
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v2.0.2
+    container_name: litellm-dragonfly
+    ulimits:
+      memlock: -1
+    command:
+      - "--logtostderr"
+      - "--dir=/data"
+      - "--dbfilename=backup"
+      - "--snapshot_cron=*/15 * * * *"
     volumes:
-      - ./data-valkey:/data
+      - ./dragonfly:/data
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6379", "PING"]
       interval: 10s
       timeout: 3s
-      retries: 3
-      start_period: 5s
+      start_period: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
+    networks:
+      - internal
 
 networks:
-  default:
+  service_main:
     external: true
     name: service_main
+  internal:
+    internal: true
