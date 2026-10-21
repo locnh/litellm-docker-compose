@@ -1,12 +1,3 @@
-# LiteLLM quickstart stack: the gateway plus a Postgres database that stores
-# models, virtual keys, and spend logs. Used by https://docs.litellm.ai/docs/proxy/docker_quick_start
-#
-# Start it directly:
-#   curl -sSL https://docs.litellm.ai/docker-compose.yml | docker compose -f - up -d
-#
-# The credentials below are placeholders for local evaluation. Before any real
-# use, download this file and set LITELLM_MASTER_KEY and LITELLM_SALT_KEY to
-# long random values, and pin the image to a release tag instead of `latest`.
 services:
   server:
     container_name: litellm
@@ -14,8 +5,10 @@ services:
     ports:
       - "4000:4000"
     environment:
+      TZ: Europe/Berlin
       AWS_PROFILE: bedrock
       AWS_REGION: eu-central-1
+
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
       STORE_MODEL_IN_DB: "True"
@@ -44,16 +37,16 @@ services:
     depends_on:
       - postgres
       - dragonfly
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:4000/health/livenes || exit 1"]
-      interval: 20s
-      timeout: 5s
-      start_period: 5s
-      retries: 3
     restart: unless-stopped
     networks:
       - internal
       - service_main
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.litellm.rule=Host(`litellm.enhack.net`)"
+      - "traefik.http.routers.litellm.entrypoints=websecure"
+      - "traefik.http.routers.litellm.middlewares=internal-only@file"
+      - "traefik.http.services.litellm.loadbalancer.server.port=4000"
 
   postgres:
     container_name: litellm-postgres
@@ -70,7 +63,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ./data-postgres:/var/lib/postgresql
+      - ./postgres:/var/lib/postgresql
     restart: unless-stopped
     networks:
       - internal
