@@ -42,6 +42,7 @@ services:
       - internal
       - service_main
     labels:
+      - "logs.collect=true"
       - "traefik.enable=true"
       - "traefik.http.routers.litellm.rule=Host(`litellm.enhack.net`)"
       - "traefik.http.routers.litellm.entrypoints=websecure"
@@ -100,4 +101,3 @@ networks:
     external: true
     name: service_main
   internal:
-    internal: true
